@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Redirecting…</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif;
+         margin: 0; height: 100vh; display: grid; place-items: center; }
+  .card { padding: 24px 28px; max-width: 560px; text-align: center; border: 1px solid #ddd; border-radius: 12px; }
+  .muted { color:#666; font-size:14px }
+</style>
+<div class="card">
+  <h1>前往下一階段…</h1>
+  <p class="muted">系統正在為您安排下一步，請勿關閉本頁。</p>
+  <p class="muted" id="status">initializing…</p>
+</div>
+<script>
+  // ======= 1) 你要導向的兩個版本網址（請改成你的實際網址） =======
+  // 建議你的網站/後測問卷能接收 URL 參數 group / aid
+  const STORY_URL = "https://www.youtube.com/watch?v=IxX_QHay02M&list=RDIxX_QHay02M&start_radio=1"; // 故事版
+  const DATA_URL  = "https://www.youtube.com/watch?v=JxS5E-kZc2s";  // 數據版
+
+  // ======= 2) 讀取入口 URL 現有參數（若前測想帶自訂代碼，可自動轉傳） =======
+  const params = new URLSearchParams(location.search);
+
+  // 可選：若你在前測已有自訂代碼（例如 pid），會被一併轉傳
+  // 另外我們也會處理本頁產生的匿名ID aid 與分派 group
+
+  // ======= 3) 產生或沿用匿名代碼（持久化於 localStorage，避免同人重整換組） =======
+  const AID_KEY = "exp_aid";
+  const GROUP_KEY = "exp_group";
+  function genUUID() {
+    return (crypto.randomUUID ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+          const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
+        }));
+  }
+  let aid = params.get("aid") || localStorage.getItem(AID_KEY);
+  if (!aid) { aid = genUUID(); localStorage.setItem(AID_KEY, aid); }
+  params.set("aid", aid); // 確保 aid 一路帶到下一頁
+
+  // ======= 4) 取得或決定組別：先看 URL 是否強制（for 測試），否則持久化或 50/50 隨機 =======
+  // 測試用：?force=story 或 ?force=data 可強制某組
+  let group = (params.get("force")==="story" || params.get("force")==="data") ? params.get("force") : null;
+  if (!group) group = localStorage.getItem(GROUP_KEY);
+  if (!group) {
+    group = Math.random() < 0.5 ? "story" : "data";
+    localStorage.setItem(GROUP_KEY, group);
+  }
+  params.delete("force"); // 清掉測試參數
+  params.set("group", group);
+
+  // ======= 5) 組合目標網址（把所有參數一起帶過去） =======
+  const base = (group === "story") ? STORY_URL : DATA_URL;
+  const target = base + (base.includes("?") ? "&" : "?") + params.toString();
+
+  // ======= 6) 導轉（replace 不留歷史紀錄；noscript 後援） =======
+  document.getElementById("status").textContent = `assigned to: ${group}, id: ${aid}`;
+  try { location.replace(target); } catch (e) { location.href = target; }
+</script>
+<noscript>
+  <meta http-equiv="refresh" content="0;url=./?js=off">
+</noscript>
